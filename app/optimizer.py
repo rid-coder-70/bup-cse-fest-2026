@@ -7,13 +7,11 @@ HOURS = 24
 
 
 def optimize(scenario: ScenarioInput, directives: list[DirectiveInterpretation]) -> list[HourPlan]:
-    # Variable groups: grid, solar use, charge, discharge, battery-after.
     offset = {name: index * HOURS for index, name in enumerate(("grid", "solar", "charge", "discharge", "energy"))}
     size = 5 * HOURS
     objective = np.zeros(size)
     for hour in scenario.hours:
         objective[offset["grid"] + hour.hour] = hour.tariff_bdt_per_kwh
-    # Break LP degeneracy so a schedule never cycles charge and discharge together.
     for hour in range(HOURS):
         objective[offset["charge"] + hour] = 1e-7
         objective[offset["discharge"] + hour] = 1e-7
