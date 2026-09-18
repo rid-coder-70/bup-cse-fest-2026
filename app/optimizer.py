@@ -13,6 +13,10 @@ def optimize(scenario: ScenarioInput, directives: list[DirectiveInterpretation])
     objective = np.zeros(size)
     for hour in scenario.hours:
         objective[offset["grid"] + hour.hour] = hour.tariff_bdt_per_kwh
+    # Break LP degeneracy so a schedule never cycles charge and discharge together.
+    for hour in range(HOURS):
+        objective[offset["charge"] + hour] = 1e-7
+        objective[offset["discharge"] + hour] = 1e-7
     effective_solar = [hour.solar_kwh for hour in scenario.hours]
     energy_lower = [scenario.battery.minimum_energy_kwh] * HOURS
     charge_upper = [scenario.battery.max_charge_kwh_per_hour] * HOURS

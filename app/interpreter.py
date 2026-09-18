@@ -45,22 +45,41 @@ def _offline_interpret(notes: list[str], capacity_kwh: float = 0.0) -> list[dict
         note = original.lower()
         hours = _hour_window(note)
         item: dict[str, Any] = {"note_index": index, "applies": False, "directive_type": "no_op", "structured_adjustment": None, "explanation": "This note does not affect the 24-hour energy schedule."}
-        percentage = re.search(r"(\d+(?:\.\d+)?)\s*%", note)
+        percentage = re.search(r"(\d+(?:\.\d+)?)\s*(?:%|percent)", note)
         if any(word in note for word in ("solar", "panel", "inverter", "cloud")) and hours and (percentage or "half" in note):
             percent = float(percentage.group(1)) if percentage else 50.0
             factor = 1 - percent / 100 if "reduction" in note else percent / 100
             item.update(applies=True, directive_type="solar_reduction", structured_adjustment={"hours": hours, "factor": max(0.0, min(1.0, factor))}, explanation="Usable solar is reduced during the stated window.")
         elif any(word in note for word in ("do not charge", "charging is disabled", "charging must remain unavailable", "charging equipment is offline", "charger will be", "charging circuit")) and hours:
             item.update(applies=True, directive_type="no_charge_window", structured_adjustment={"hours": hours}, explanation="Battery charging is unavailable during the stated window.")
-        elif any(word in note for word in ("do not discharge", "must not discharge", "battery discharge is forbidden", "discharging is unavailable")) and hours:
+        elif any(
+            word in note
+            for word in (
+                "do not discharge",
+                "do not use battery discharge",
+                "must not discharge",
+                "battery discharge is forbidden",
+                "discharging is unavailable",
+            )
+        ) and hours:
             item.update(applies=True, directive_type="no_discharge_window", structured_adjustment={"hours": hours}, explanation="Battery discharging is unavailable during the stated window.")
         elif any(word in note for word in ("grid import", "grid intake", "substation intake", "feeder", "transformer")) and hours:
             cap = re.search(r"(?:not exceed|at or below|limit is|limited to|no more than)\s+(\d+(?:\.\d+)?)", note)
             if cap:
                 item.update(applies=True, directive_type="max_grid_window", structured_adjustment={"hours": hours, "max_grid_kwh": float(cap.group(1))}, explanation="Grid import is capped during the stated window.")
-        elif any(word in note for word in ("reserve", "keep at least", "remain in the battery")) and hours:
+        elif any(
+            word in note
+            for word in (
+                "reserve",
+                "keep at least",
+                "maintain at least",
+                "battery state",
+                "remain in the battery",
+                "stored",
+            )
+        ) and hours:
             amount = re.search(r"(\d+(?:\.\d+)?)\s*kwh", note)
-            percentage = re.search(r"(\d+(?:\.\d+)?)\s*%", note)
+            percentage = re.search(r"(\d+(?:\.\d+)?)\s*(?:%|percent)", note)
             if amount or percentage:
                 item.update(applies=True, directive_type="minimum_battery_reserve", structured_adjustment={"hours": hours, "minimum_energy_kwh": float(amount.group(1)) if amount else 0.0}, explanation="Battery energy must remain above the stated reserve.")
                 if percentage:
@@ -71,16 +90,33 @@ def _offline_interpret(notes: list[str], capacity_kwh: float = 0.0) -> list[dict
 
 class NoteInterpreter:
     async def interpret(self, scenario: ScenarioInput) -> list[DirectiveInterpretation]:
-        raw = await self._model_interpret(scenario)
+        try:
+            raw = await self._model_interpret(scenario)
+        except Exception:
+            raw = _offline_interpret(
+                scenario.operator_notes,
+                scenario.battery.capacity_kwh,
+            )
         try:
             return validate_directives(raw, scenario)
         except ValueError:
-            return validate_directives(_offline_interpret(scenario.operator_notes, scenario.battery.capacity_kwh), scenario)
+            return validate_directives(
+                _offline_interpret(
+                    scenario.operator_notes,
+                    scenario.battery.capacity_kwh,
+                ),
+                scenario,
+            )
 
     async def _model_interpret(self, scenario: ScenarioInput) -> list[dict]:
         url = os.getenv("MODEL_API_URL")
         key = os.getenv("MODEL_API_KEY")
-        if not url or not key:
+        placeholders = ("YOUR_", "your_", "CHANGE_ME", "changeme")
+        if (
+            not url
+            or not key
+            or any(value.startswith(placeholders) for value in (url, key))
+        ):
             return _offline_interpret(scenario.operator_notes, scenario.battery.capacity_kwh)
         payload = {
             "model": os.getenv("MODEL_NAME", "gpt-4o-mini"),
