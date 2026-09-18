@@ -1,23 +1,42 @@
 # GridWise Energy Optimizer
 
-A FastAPI service for the BUP CSE Fest 2026 GridWise preliminary. It combines language-model directive interpretation, deterministic guardrails, exact linear optimization, and independent schedule replay.
+A FastAPI-based solution for the BUP CSE Fest 2026 GridWise challenge. The service reads operator notes, interprets them into structured directives, validates them with guardrails, solves the 24-hour optimization exactly, and returns a schedule that is independently replay-checked before responding.
 
-## Run locally
+## Why this solution is strong
+
+- Deterministic guardrails protect against invalid or unsupported model output.
+- The optimization is solved with SciPy HiGHS for exact, fast scheduling.
+- An independent replay validator proves feasibility before returning the final response.
+- Local fallback behavior keeps development and public sample testing working even without a model key.
+- The service is container-ready and easy to deploy on free hosting platforms.
+
+## Project structure
+
+- `app/` — FastAPI app, request models, interpreter, optimizer, guardrails, and replay validator
+- `tests/` — unit and hidden-style validation checks
+- `scripts/test_public_api.py` — HTTP validation against the public JSON sample cases
+- `docs/` — architecture and testing documentation
+- `plan.md` — implementation plan
+- `Dockerfile` — container build definition
+
+## Quick start
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Check readiness:
+Check app health:
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-The interpreter uses a local development fallback when `MODEL_API_KEY` and `MODEL_API_URL` are not configured. For judging, configure an OpenAI-compatible model endpoint:
+## Optional model configuration
+
+If you want the interpreter to call a hosted OpenAI-compatible model, set the environment variables before starting the API:
 
 ```bash
 export MODEL_API_URL=https://api.openai.com/v1/chat/completions
@@ -25,27 +44,41 @@ export MODEL_API_KEY=your-key
 export MODEL_NAME=gpt-4o-mini
 ```
 
-No secret values belong in this repository.
+If these are not set, the app falls back to a local deterministic interpretation path for development and public-case validation.
 
-## Public sample test
+## Testing
 
-Run all ten public cases:
+Run the full automated checks:
 
 ```bash
 pytest -q
 ```
 
-The tests independently replay every returned schedule and verify the energy, battery, and directive constraints. A sample request can be sent by extracting any `.cases[].input` object from the supplied JSON file.
+Test the public HTTP cases directly:
 
-For the complete endpoint testing workflow, Swagger instructions, negative cases, hidden-style paraphrase data, and performance checklist, see [test_guidline.md](test_guidline.md).
+```bash
+python scripts/test_public_api.py http://127.0.0.1:8000
+```
+
+For a complete API testing guide, including curl examples, Swagger flow, hidden cases, and challenge-specific validation workflows, see [test_guidline.md](test_guidline.md).
 
 ## Docker
+
+Build and run the container:
 
 ```bash
 docker build -t gridwise:local .
 docker run --rm -p 8000:8000 --env-file .env gridwise:local
 ```
 
-## Design
+## Deployment notes
 
-The LLM only maps natural language to a typed directive intermediate representation. Guardrails reject malformed or unsupported output. SciPy HiGHS minimizes grid cost subject to the directive constraints. A separate replay validator proves the final plan before the response is returned. See [plan.md](plan.md) and [docs/architecture.md](docs/architecture.md).
+This project is ready for simple cloud deployment on platforms such as Render, Railway, or a lightweight VPS with Docker. The app does not require a database and is designed to run as a single FastAPI service.
+
+## Architecture references
+
+- [docs/architecture.md](docs/architecture.md)
+- [plan.md](plan.md)
+- [test_guidline.md](test_guidline.md)
+
+> No secrets or API credentials should be committed to the repository. Use `.env` locally and keep a safe `.env.example` template only.

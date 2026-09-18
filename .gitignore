@@ -1,5 +1,32 @@
+# Python virtual environments and cache
 .venv/
+venv/
 __pycache__/
+.pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Secrets and local env files
 .env
+.env.*
+!.env.example
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Editor/system noise
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
 *.pyc
+*.pyo
+*.pyd
+VIDEO_SCRIPT.md
