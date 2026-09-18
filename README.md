@@ -34,6 +34,13 @@ Check app health:
 curl http://localhost:8000/health
 ```
 
+## Deployed API
+
+Railway deployment: https://bup-cse-fest-2026-production.up.railway.app
+
+- Swagger UI: https://bup-cse-fest-2026-production.up.railway.app/docs
+- Health check: https://bup-cse-fest-2026-production.up.railway.app/health
+
 ## Optional model configuration
 
 If you want the interpreter to call a hosted OpenAI-compatible model, set the environment variables before starting the API:
