@@ -106,7 +106,159 @@ A valid `SAMPLE-01` response must contain:
 
 The complete response also contains two directive entries and 24 hourly-plan entries. The action sequence does not have to equal the reference byte-for-byte. Any valid schedule with equivalent optimal cost is accepted.
 
-## 4. Response Validation Rules
+## 4. Test All Ten Samples Through the HTTP API
+
+The most reliable black-box test is to start the server and submit every `input` object from the JSON file to the real endpoint. Run the server in terminal 1:
+
+```bash
+source .venv/bin/activate
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Run the complete HTTP test in terminal 2:
+
+```bash
+.venv/bin/python scripts/test_public_api.py
+```
+
+You can also test another deployed base URL:
+
+```bash
+.venv/bin/python scripts/test_public_api.py https://your-service.example.com
+```
+
+Expected output is one `PASS` line per case followed by:
+
+```text
+All 10 public API cases passed.
+```
+
+The runner checks `/health`, sends all ten requests, validates the scenario ID, directive types, structured adjustments, 24-hour plan length, total grid, total cost, and peak grid usage. It does not require the hourly plan to match the reference byte-for-byte because equivalent optimal schedules are valid.
+
+## 5. Test Through FastAPI Swagger UI
+
+FastAPI automatically provides interactive documentation at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+The direct page for the main endpoint is:
+
+```text
+http://127.0.0.1:8000/docs#/default/optimize_energy_optimize_energy_post
+```
+
+Steps:
+
+1. Start the service with Uvicorn.
+2. Open the Swagger URL in a browser.
+3. Expand `POST /optimize-energy`.
+4. Click `Try it out`.
+5. Open `BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json`.
+6. Copy only one case's `input` object, not the complete file and not the `expected_output` object.
+7. Paste that object into the Swagger request editor.
+8. Click `Execute`.
+9. Confirm the response code is `200`.
+10. Inspect `directive_interpretation`, `hourly_plan`, `total_grid_kwh`, `total_cost_bdt`, and `peak_grid_kwh`.
+
+For example, the beginning of the `SAMPLE-01` request is:
+
+```json
+{
+  "scenario_id": "SAMPLE-01",
+  "operator_notes": [
+    "Facilities will wash the rooftop solar panels from noon until 2 PM. During cleaning, usable solar should be treated as roughly 25% of the forecast.",
+    "The sports office moved next month's registration deadline."
+  ],
+  "hours": [
+    {"hour": 0, "demand_kwh": 90, "solar_kwh": 0, "tariff_bdt_per_kwh": 6}
+  ],
+  "battery": {
+    "capacity_kwh": 220,
+    "initial_energy_kwh": 110,
+    "minimum_energy_kwh": 40,
+    "max_charge_kwh_per_hour": 50,
+    "max_discharge_kwh_per_hour": 50
+  }
+}
+```
+
+The real `hours` array must contain all 24 entries. Use the full `cases[0].input` object from the JSON file when testing Swagger.
+
+Swagger shows the complete response. For `SAMPLE-01`, the important expected values are:
+
+```json
+{
+  "scenario_id": "SAMPLE-01",
+  "total_grid_kwh": 2692.5,
+  "total_cost_bdt": 38365.0,
+  "peak_grid_kwh": 175.0
+}
+```
+
+## 6. Generate One Swagger Request Automatically
+
+If manually copying a large 24-hour object is inconvenient, extract a case into a temporary JSON file, then open it and paste its contents into Swagger:
+
+```bash
+.venv/bin/python - <<'PY'
+import json
+
+with open("BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json") as source:
+    pack = json.load(source)
+
+with open("/tmp/gridwise-sample-01-request.json", "w") as target:
+    json.dump(pack["cases"][0]["input"], target, indent=2)
+
+print("Created /tmp/gridwise-sample-01-request.json")
+PY
+```
+
+To extract another case, change `[0]` to `[1]` through `[9]`. The mapping is:
+
+```text
+0 SAMPLE-01
+1 SAMPLE-02
+2 SAMPLE-03
+3 SAMPLE-04
+4 SAMPLE-05
+5 SAMPLE-06
+6 SAMPLE-07
+7 SAMPLE-08
+8 SAMPLE-09
+9 SAMPLE-10
+```
+
+## 7. Directly Call One Case with curl
+
+This sends `SAMPLE-05` without Swagger:
+
+```bash
+.venv/bin/python - <<'PY' > /tmp/gridwise-sample-05-request.json
+import json
+pack = json.load(open("BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json"))
+json.dump(pack["cases"][4]["input"], __import__("sys").stdout)
+PY
+
+curl -sS -X POST http://127.0.0.1:8000/optimize-energy \
+  -H 'Content-Type: application/json' \
+  --data-binary @/tmp/gridwise-sample-05-request.json \
+  | .venv/bin/python -m json.tool
+```
+
+`SAMPLE-05` should report approximately:
+
+```json
+{
+  "scenario_id": "SAMPLE-05",
+  "total_grid_kwh": 2430.0,
+  "total_cost_bdt": 33950.0,
+  "peak_grid_kwh": 175.0
+}
+```
+
+## 8. Response Validation Rules
 
 For every successful response, check:
 
@@ -154,7 +306,7 @@ total_cost_bdt = sum(grid_kwh * tariff_bdt_per_kwh)
 peak_grid_kwh = max(grid_kwh)
 ```
 
-## 5. Run the Automated Tests
+## 9. Run the Automated Tests
 
 Run all tests:
 
@@ -190,7 +342,7 @@ The test suite includes:
 - optimizer and replay validation
 - 24-hour response shape checks
 
-## 6. Public Test Cases and Correct Expected Results
+## 10. Public Test Cases and Correct Expected Results
 
 The following values come from the supplied public reference file. Directive hours use start-inclusive/end-exclusive semantics.
 
@@ -209,7 +361,7 @@ The following values come from the supplied public reference file. Directive hou
 
 Important: the exact hourly plan can differ from the reference schedule. The judge accepts an equivalent valid optimum, not only one exact action sequence.
 
-## 7. Print All Public Expected Output Summaries
+## 11. Print All Public Expected Output Summaries
 
 Use this command to inspect every reference response summary:
 
@@ -240,7 +392,7 @@ print(json.dumps(case["expected_output"], indent=2))
 PY
 ```
 
-## 8. Hidden-Style Test Cases
+## 12. Hidden-Style Test Cases
 
 These are local hidden-style cases, not the organizer's private judge cases. They test paraphrase robustness and should not be hard-coded by case ID in the application.
 
@@ -276,7 +428,7 @@ The hidden-style request generator uses:
 
 The actual reusable hidden-style data is stored in [tests/data/hidden_style_cases.json](tests/data/hidden_style_cases.json).
 
-## 9. Manual Hidden-Style API Test
+## 13. Manual Hidden-Style API Test
 
 Send one hidden-style scenario through the real endpoint:
 
@@ -317,7 +469,7 @@ Expected key interpretation for HIDDEN-01:
 
 The response also contains a valid 24-row `hourly_plan`. Its exact values may differ from another optimal solution, so validate constraints and totals instead of comparing the entire response as a raw string.
 
-## 10. Negative API Tests
+## 14. Negative API Tests
 
 ### Missing required fields
 
@@ -349,7 +501,7 @@ curl -i -X POST http://127.0.0.1:8000/optimize-energy \
 
 Expected status: `400` or `422`.
 
-## 11. External LLM Testing
+## 15. External LLM Testing
 
 For local tests, leave the model key unset or use placeholder values. The service then uses the deterministic fallback and tests remain repeatable.
 
@@ -366,7 +518,7 @@ Test provider behavior separately from API correctness. A provider timeout, 404,
 
 Never print the key when debugging. Never commit `.env`.
 
-## 12. Testing Checklist
+## 16. Testing Checklist
 
 Before submission:
 
