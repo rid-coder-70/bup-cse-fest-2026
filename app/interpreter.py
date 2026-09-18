@@ -4,9 +4,12 @@ import re
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 
 from .guardrails import validate_directives
 from .models import DirectiveInterpretation, ScenarioInput
+
+load_dotenv()
 
 SYSTEM_PROMPT = """You interpret campus energy operator notes. Return JSON only with a directives array.
 Return exactly one item per note, in note_index order. Allowed types are solar_reduction,
@@ -19,8 +22,12 @@ no_op with applies false and null adjustment. Never change demand, tariff, or ba
 def _hour_window(note: str) -> list[int]:
     note = re.sub(r"\bnoon\b", "12 PM", note, flags=re.I)
     note = re.sub(r"\bmidnight\b", "12 AM", note, flags=re.I)
-    match = re.search(r"(?:from|between)\s+(\d{1,2})\s*(AM|PM)?\s+"
-                      r"(?:until|to|and)\s+(\d{1,2})\s*(AM|PM)?", note, re.I)
+    match = re.search(
+        r"(?:from|between)\s+(\d{1,2})(?::\d{2})?\s*(AM|PM)?\s+"
+        r"(?:until|to|and|through)\s+(\d{1,2})(?::\d{2})?\s*(AM|PM)?",
+        note,
+        re.I,
+    )
     if not match:
         return []
     start, start_meridiem, end, end_meridiem = match.groups()
@@ -43,12 +50,12 @@ def _offline_interpret(notes: list[str], capacity_kwh: float = 0.0) -> list[dict
             percent = float(percentage.group(1)) if percentage else 50.0
             factor = 1 - percent / 100 if "reduction" in note else percent / 100
             item.update(applies=True, directive_type="solar_reduction", structured_adjustment={"hours": hours, "factor": max(0.0, min(1.0, factor))}, explanation="Usable solar is reduced during the stated window.")
-        elif any(word in note for word in ("do not charge", "charging is disabled", "charger will be", "charging circuit")) and hours:
+        elif any(word in note for word in ("do not charge", "charging is disabled", "charging must remain unavailable", "charging equipment is offline", "charger will be", "charging circuit")) and hours:
             item.update(applies=True, directive_type="no_charge_window", structured_adjustment={"hours": hours}, explanation="Battery charging is unavailable during the stated window.")
-        elif any(word in note for word in ("do not discharge", "must not discharge", "discharging is unavailable")) and hours:
+        elif any(word in note for word in ("do not discharge", "must not discharge", "battery discharge is forbidden", "discharging is unavailable")) and hours:
             item.update(applies=True, directive_type="no_discharge_window", structured_adjustment={"hours": hours}, explanation="Battery discharging is unavailable during the stated window.")
-        elif any(word in note for word in ("grid import", "grid intake", "feeder", "transformer")) and hours:
-            cap = re.search(r"(?:not exceed|at or below|limit is)\s+(\d+(?:\.\d+)?)", note)
+        elif any(word in note for word in ("grid import", "grid intake", "substation intake", "feeder", "transformer")) and hours:
+            cap = re.search(r"(?:not exceed|at or below|limit is|limited to|no more than)\s+(\d+(?:\.\d+)?)", note)
             if cap:
                 item.update(applies=True, directive_type="max_grid_window", structured_adjustment={"hours": hours, "max_grid_kwh": float(cap.group(1))}, explanation="Grid import is capped during the stated window.")
         elif any(word in note for word in ("reserve", "keep at least", "remain in the battery")) and hours:

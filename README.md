@@ -37,6 +37,8 @@ pytest -q
 
 The tests independently replay every returned schedule and verify the energy, battery, and directive constraints. A sample request can be sent by extracting any `.cases[].input` object from the supplied JSON file.
 
+For the complete endpoint testing workflow, negative cases, hidden-style paraphrase data, and performance checklist, see [docs/api-testing-guide.md](docs/api-testing-guide.md).
+
 ## Docker
 
 ```bash

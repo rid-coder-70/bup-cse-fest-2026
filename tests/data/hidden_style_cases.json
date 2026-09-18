@@ -1,0 +1,12 @@
+[
+  {"id":"HIDDEN-01","notes":["The inverter will leave only 30% of forecast PV from 09:00 to 11:00."],"expected":[{"type":"solar_reduction","hours":[9,10],"factor":0.3}]},
+  {"id":"HIDDEN-02","notes":["Charging must remain unavailable between 03:00 and 06:00."],"expected":[{"type":"no_charge_window","hours":[3,4,5]}]},
+  {"id":"HIDDEN-03","notes":["Keep a 180 kWh emergency reserve from 6 PM until 9 PM."],"expected":[{"type":"minimum_battery_reserve","hours":[18,19,20],"minimum_energy_kwh":180}]},
+  {"id":"HIDDEN-04","notes":["During relay diagnostics, battery discharge is forbidden from 7 PM to 10 PM."],"expected":[{"type":"no_discharge_window","hours":[19,20,21]}]},
+  {"id":"HIDDEN-05","notes":["Substation intake is limited to 140 kWh between 5 PM and 7 PM."],"expected":[{"type":"max_grid_window","hours":[17,18],"max_grid_kwh":140}]},
+  {"id":"HIDDEN-06","notes":["The campus newsletter is delayed until tomorrow."],"expected":[{"type":"no_op"}]},
+  {"id":"HIDDEN-07","notes":["Heavy cloud means about half the expected solar from 1 PM to 3 PM.","The charging equipment is offline from 2 PM until 4 PM."],"expected":[{"type":"solar_reduction","hours":[13,14],"factor":0.5},{"type":"no_charge_window","hours":[14,15]}]},
+  {"id":"HIDDEN-08","notes":["Maintain at least 60% battery state from 8 PM to 11 PM."],"expected":[{"type":"minimum_battery_reserve","hours":[20,21,22],"minimum_energy_kwh":180}]},
+  {"id":"HIDDEN-09","notes":["An 80 percent solar reduction is expected from 10 AM through noon.","Do not use battery discharge from 6 PM until 8 PM.","The parking permit deadline moved."],"expected":[{"type":"solar_reduction","hours":[10,11],"factor":0.2},{"type":"no_discharge_window","hours":[18,19]},{"type":"no_op"}]},
+  {"id":"HIDDEN-10","notes":["The evening feeder can accept no more than 170 kWh from 6 PM to 9 PM.","Keep 100 kWh stored from 6 PM until 10 PM.","Panel output will be 25% of forecast between noon and 2 PM."],"expected":[{"type":"max_grid_window","hours":[18,19,20],"max_grid_kwh":170},{"type":"minimum_battery_reserve","hours":[18,19,20,21],"minimum_energy_kwh":100},{"type":"solar_reduction","hours":[12,13],"factor":0.25}]}
+]
